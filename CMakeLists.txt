@@ -23,4 +23,18 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+find_package(OpenCV REQUIRED)
+
+add_executable(image_publisher src/image_publisher.cpp)
+ament_target_dependencies(image_publisher rclcpp sensor_msgs cv_bridge)
+target_link_libraries(image_publisher ${OpenCV_LIBS})
+
+add_executable(image_saver src/image_saver.cpp)
+ament_target_dependencies(image_saver rclcpp sensor_msgs cv_bridge)
+target_link_libraries(image_saver ${OpenCV_LIBS})
+install(TARGETS
+  image_publisher
+  image_saver
+  DESTINATION lib/${PROJECT_NAME}
+)
 ament_package()
