@@ -24,14 +24,17 @@ if(BUILD_TESTING)
 endif()
 
 find_package(OpenCV REQUIRED)
+find_package(std_filesystem REQUIRED)
+find_package(std_msgs REQUIRED)
 
 add_executable(image_publisher src/image_publisher.cpp)
-ament_target_dependencies(image_publisher rclcpp sensor_msgs cv_bridge)
+ament_target_dependencies(image_publisher rclcpp sensor_msgs std_msgs cv_bridge)
 target_link_libraries(image_publisher ${OpenCV_LIBS})
 
 add_executable(image_saver src/image_saver.cpp)
-ament_target_dependencies(image_saver rclcpp sensor_msgs cv_bridge)
+ament_target_dependencies(image_saver rclcpp sensor_msgs std_msgs cv_bridge)
 target_link_libraries(image_saver ${OpenCV_LIBS})
+
 install(TARGETS
   image_publisher
   image_saver

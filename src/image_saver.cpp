@@ -7,8 +7,9 @@
 #include<chrono>
 #include<iomanip>
 #include<sstream>
+#include<cstdlib>
 
-class ImageSubscriber : public rclcpp::Node
+class ImageSaver : public rclcpp::Node
 {
 public:
     ImageSaver()
@@ -28,14 +29,13 @@ public:
                 save_directory_ = std::string(home) + save_directory_.substr(1);
             }
         }
-    }
 
-    std::filesystem::create_directories(save_directory_);
+        std::filesystem::create_directories(save_directory_);
 
     RCLCPP_INFO(get_logger(), "Saving images to: %s", save_directory_.c_str());
     RCLCPP_INFO(get_logger(), "Downscale factor: %.2f", downscale_factor_);
 
-    sunscription_ = create_subscription<sensor_msgs::msg::Image>(
+    subscription_ = create_subscription<sensor_msgs::msg::Image>(
         "raw_image", 10,
         std::bind(&ImageSaver::topic_callback, this, std::placeholders::_1)
     );
@@ -44,6 +44,7 @@ public:
 private:
     void topic_callback(const sensor_msgs::msg::Image::SharedPtr msg)
     {
+    try {
         cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, "bgr8");
         cv::Mat resized_img;
         cv::resize(cv_ptr->image, resized_img, cv::Size(), downscale_factor_, downscale_factor_);

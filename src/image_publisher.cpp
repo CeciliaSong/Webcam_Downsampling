@@ -3,6 +3,7 @@
 #include<cv_bridge/cv_bridge.h>
 #include<opencv2/opencv.hpp>
 #include<chrono>
+#include<std_msgs/msg/header.hpp>
 
 class ImagePublisher : public rclcpp::Node
 {
@@ -37,7 +38,7 @@ public:
         publisher_ = create_publisher<sensor_msgs::msg::Image>("raw_image", 10);
         timer_ = create_wall_timer(
             std::chrono::milliseconds(1000 / fps),
-            std::bind(&ImagePublisher::capture_and_publish, this)
+            std::bind(&ImagePublisher::timer_callback, this);
         );
     }
 
@@ -56,7 +57,11 @@ private:
         publisher_->publish(*msg);
         RCLCPP_DEBUG(get_logger(), "Published frame of size %dx%d.", frame.cols, frame.rows);
     }
-}
+
+    cv::VideoCapture cap_;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_;
+    rclcpp::TimerBase::SharedPtr timer_;
+};
 
 int main(int argc, char* argv[])
 {
