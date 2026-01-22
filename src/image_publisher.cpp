@@ -1,101 +1,84 @@
-#include<rclcpp/rclcpp.hpp>
-#include<sensor_msgs/msg/image.hpp>
-#include<cv_bridge/cv_bridge.h>
-#include<opencv2/opencv.hpp>
-#include<chrono>
-#include<std_msgs/msg/header.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <std_msgs/msg/header.hpp>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/opencv.hpp>
+#include <chrono>
 
 class ImagePublisher : public rclcpp::Node
 {
 public:
-    ImagePublisher()
-    : Node("image_publisher")
+    ImagePublisher() : Node("image_publisher")
     {
         declare_parameter("camera_id", 0);
         declare_parameter("fps", 25);
         declare_parameter("width", 1920);
         declare_parameter("height", 1080);
 
-        int camera_id = get_parameter("camera_id").as_int();
+        const int camera_id = get_parameter("camera_id").as_int();
         int fps = get_parameter("fps").as_int();
-        int width = get_parameter("width").as_int();    
-        int height = get_parameter("height").as_int();
+        if (fps <= 0) {
+            fps = 25;
+        }
+        const int width = get_parameter("width").as_int();
+        const int height = get_parameter("height").as_int();
 
-        cap_.open(camera_id);
-        if(!cap_.isOpened())
-        {
-            RCLCPP_ERROR(get_logger(), "Error: Could not open camera with ID %d.", camera_id);
-            //rclcpp::shutdown();
-            return; 
+        // Prefer V4L2; fall back to any backend if needed
+        cap_.open(camera_id, cv::CAP_V4L2);
+        if (!cap_.isOpened()) {
+            cap_.open(camera_id, cv::CAP_ANY);
+        }
+        if (!cap_.isOpened()) {
+            RCLCPP_ERROR(get_logger(), "Could not open camera ID %d", camera_id);
+            throw std::runtime_error("camera open failed");
         }
 
         cap_.set(cv::CAP_PROP_FRAME_WIDTH, width);
         cap_.set(cv::CAP_PROP_FRAME_HEIGHT, height);
         cap_.set(cv::CAP_PROP_FPS, fps);
+        cap_.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G'));
 
+        // Warm up a few frames to stabilize pipeline/exposure
         cv::Mat warmup;
-        //RCLCPP_INFO(get_logger(), "Camera initialized with resolution %dx%d at %d FPS.", width, height, fps);
+        for (int i = 0; i < 5; ++i) {
+            cap_ >> warmup;
+            if (!warmup.empty()) {
+                break;
+            }
+            rclcpp::sleep_for(std::chrono::milliseconds(50));
+        }
+
+        RCLCPP_INFO(get_logger(), "Camera ready: %dx%d @ %d fps", width, height, fps);
 
         publisher_ = create_publisher<sensor_msgs::msg::Image>("raw_image", 10);
-        // timer_ = create_wall_timer(
-        //     std::chrono::milliseconds(1000 / fps),
-        //     std::bind(&ImagePublisher::timer_callback, this)
-        // );
-        
-        loop_delay_us_ = static_cast<int>(1e6 / fps);
-    }
-
-    void run()
-    {
-        cv::Mat frame;
-        rclcpp::WallRate loop_rate{std::chrono::microseconds(loop_delay_us_)};
-        while(rclcpp::ok())
-        {
-            cap_ >> frame;
-            if(frame.empty())
-            {
-                RCLCPP_WARN(get_logger(), "Warning: Captured empty frame.");
-                continue;
-            }
-            else
-            {
-                auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame).toImageMsg();
-                publisher_->publish(*msg);
-                RCLCPP_DEBUG(get_logger(), "Published frame of size %dx%d.", frame.cols, frame.rows);
-            }
-            rclcpp::spin_some(shared_from_this());
-            loop_rate.sleep();
-        }
+        timer_ = create_wall_timer(
+            std::chrono::milliseconds(1000 / fps),
+            std::bind(&ImagePublisher::timer_callback, this));
     }
 
 private:
-    // void timer_callback()
-    // {
-    //     cv::Mat frame;
-    //     cap_ >> frame;
-    //     if(frame.empty())
-    //     {
-    //         RCLCPP_WARN(get_logger(), "Warning: Captured empty frame.");
-    //         return;
-    //     }
+    void timer_callback()
+    {
+        cv::Mat frame;
+        cap_ >> frame;
+        if (frame.empty()) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 3000, "Captured empty frame");
+            return;
+        }
 
-    //     auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame).toImageMsg();
-    //     publisher_->publish(*msg);
-    //     RCLCPP_DEBUG(get_logger(), "Published frame of size %dx%d.", frame.cols, frame.rows);
-    // }
+        auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frame).toImageMsg();
+        publisher_->publish(*msg);
+    }
 
     cv::VideoCapture cap_;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_;
-    //rclcpp::TimerBase::SharedPtr timer_;
-    int64_t loop_delay_us_;
+    rclcpp::TimerBase::SharedPtr timer_;
 };
 
 int main(int argc, char* argv[])
 {
     rclcpp::init(argc, argv);
-    //rclcpp::spin(std::make_shared<ImagePublisher>());
-    auto node = std::make_shared<ImagePublisher>();
-    node->run();
+    rclcpp::spin(std::make_shared<ImagePublisher>());
     rclcpp::shutdown();
     return 0;
 }
