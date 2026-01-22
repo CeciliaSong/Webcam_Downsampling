@@ -38,7 +38,7 @@ public:
         publisher_ = create_publisher<sensor_msgs::msg::Image>("raw_image", 10);
         timer_ = create_wall_timer(
             std::chrono::milliseconds(1000 / fps),
-            std::bind(&ImagePublisher::timer_callback, this);
+            std::bind(&ImagePublisher::timer_callback, this)
         );
     }
 

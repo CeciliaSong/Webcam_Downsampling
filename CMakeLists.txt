@@ -24,7 +24,6 @@ if(BUILD_TESTING)
 endif()
 
 find_package(OpenCV REQUIRED)
-find_package(std_filesystem REQUIRED)
 find_package(std_msgs REQUIRED)
 
 add_executable(image_publisher src/image_publisher.cpp)

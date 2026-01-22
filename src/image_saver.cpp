@@ -42,28 +42,29 @@ public:
 }
 
 private:
-    void topic_callback(const sensor_msgs::msg::Image::SharedPtr msg)
-    {
-    try {
-        cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, "bgr8");
-        cv::Mat resized_img;
-        cv::resize(cv_ptr->image, resized_img, cv::Size(), downscale_factor_, downscale_factor_);
-
-        auto now = std::chrono::system_clock::now();
-        auto time_t = std::chrono::system_clock::to_time_t(now);
-        std::stringstream ss;
-        ss << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S.jpg");
-        std::string file_path = save_directory_ + "/" + ss.str();
-
-        cv::imwrite(file_path, resized_img);
-        RCLCPP_INFO(get_logger(), "Saved image: %s", file_path.c_str());
-    } catch (cv_bridge::Exception& e) {
-        RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
-    }
-
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
     std::string save_directory_;
     double downscale_factor_;
+    void topic_callback(const sensor_msgs::msg::Image::SharedPtr msg)
+    {
+        try {
+            cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, "bgr8");
+            cv::Mat resized_img;
+            cv::resize(cv_ptr->image, resized_img, cv::Size(), downscale_factor_, downscale_factor_);
+
+            auto now = std::chrono::system_clock::now();
+            auto time_t = std::chrono::system_clock::to_time_t(now);
+            std::stringstream ss;
+            ss << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S.jpg");
+            std::string file_path = save_directory_ + "/" + ss.str();
+
+            cv::imwrite(file_path, resized_img);
+            RCLCPP_INFO(get_logger(), "Saved image: %s", file_path.c_str());
+        } catch (cv_bridge::Exception& e) {
+            RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
+        }
+    }
+    
 };
 
 int main(int argc, char * argv[])
